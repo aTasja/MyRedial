@@ -42,6 +42,7 @@ import java.util.logging.LogRecord;
 import android.os.Handler;
 
 public class MainActivity extends Activity {
+
     public final static int MY_PERMISSIONS_REQUEST = 11;
 
     EditText phoneNumber;
@@ -49,16 +50,21 @@ public class MainActivity extends Activity {
 
     String TAG = "myLOG";
 
-    int attempts;
+    int attempts = 0;
     EditText attemptsNUM;
     TextView counter;
     int intDuration = 999999999;
-    boolean callEnded;
+
+    String number;
+    private static int mLastState;
+    String phoneListener;
 
     /**
      * Use BroadcastReceiver instances for receiving intents
      */
     private BroadcastReceiver mReceiver = null;
+    boolean callMaking;
+    boolean callEnded;
 
 
 
@@ -84,12 +90,14 @@ public class MainActivity extends Activity {
 
         attemptsNUM = findViewById(R.id.atteptsNum);
 
-        called = false;
+
         requestAsked = false;
         //callEnded = true;
 
         phoneNumber = findViewById(R.id.phone_number);
         counter = findViewById(R.id.counter);
+
+
 
 
 
@@ -104,33 +112,17 @@ public class MainActivity extends Activity {
         callButton = findViewById(R.id.call_button);
         callButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                called = false;
+                callMaking = false;
                 attempts = Integer.parseInt(attemptsNUM.getText().toString());
+                number = phoneNumber.getText().toString();
                 Log.d(TAG, "CALL button pressed, attempts = " + attempts);
                 call();
             }
         });
 
 
-        // Initialize a new BroadcastReceiver instance for local intents from RadioService.
-        mReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                // Display a notification that radio has been connected.
-                Bundle extras = intent.getExtras();
-                if (extras != null){
-                    String status = intent.getExtras().getString("CALL_STATE");
-                    Log.d(TAG, "local intent received -- " + status);
-                }
 
-
-
-
-            }
-        };
-
-        // Register Local Broadcast receiver - use to receive messages from service
-        IntentFilter serviceFilter = new IntentFilter("CALL_STATE");
-        LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, serviceFilter);
 
 
     }
@@ -154,14 +146,21 @@ public class MainActivity extends Activity {
         Log.d(TAG, "call method");
 
         //int attemptsEditText = Integer.parseInt(attemptsNUM.getText().toString());
-        if (attempts > 0 && (ActivityCompat.checkSelfPermission(MainActivity.this,
+        if (!callMaking &&(ActivityCompat.checkSelfPermission(MainActivity.this,
                     Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED)) {
             Log.d(TAG, "call number = " + phoneNumber.getText() + " attempts = " + attempts);
-            getApplicationContext().startActivity(new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNumber.getText())));
+
+            Intent intent = new Intent(this, CallService.class);
+            intent.putExtra("number", phoneNumber.getText().toString());
+
+            startService(intent);
+            Log.d(TAG, "intent to service sent + phone status " + MyPhoneStateListener.nextCall);
+
+            // getApplicationContext().startActivity(new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNumber.getText())));
             called = true;
-            //Log.d(TAG, "attempts =" + attempts);
-            attempts--;
-            counter.setText("Осталось " + attempts + " попыток");
+            callMaking  =true;
+
+            //callEnded = false;
 
 
         }else{
@@ -181,7 +180,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onResume() {
-        Log.d(TAG, "=== onResume ===" + attempts + callEnded);
+        Log.d(TAG, "=== onResume === " + "attempts = " + attempts + " phoneListener = " +  MyPhoneStateListener.nextCall + " callMaking = " + callMaking);
         super.onResume();
 
 
@@ -191,52 +190,21 @@ public class MainActivity extends Activity {
             String number = callDetails.get(0).toString();
 
             intDuration = Integer.parseInt(callDetails.get(1).toString());
+            phoneNumber.setText(callDetails.get(0).toString());
 
             //Log.d(TAG, "Number === " + number + " ===");
             //Log.d(TAG, "Duration === " + intDuration + " ===");
 
-
-            phoneNumber.setText(callDetails.get(0).toString());
         }
-        if (callEnded && MyPhoneStateListener.callStatus.equals("OFFHOOK")){
-            Log.d(TAG, "звонок начался");
-            callEnded = false;
-        }
-        if (!callEnded){
-            if (MyPhoneStateListener.callStatus == ("IDLE") && intDuration == 0) {
-                Log.d(TAG, "звонок окончился");
-                callEnded = true;
+        if (attempts > 0 && called )
+            if (MyPhoneStateListener.nextCall && callMaking) {
+                callMaking = false;
                 call();
-            }
+                attempts--;
+                counter.setText("Осталось " + attempts + " попыток");
+                called = false;
         }
 
-
-
-        /*
-         * Use PhoneStateListener instances for listening to phone state
-         *//*
-        TelephonyManager mIncomingCallsReceiver = (TelephonyManager) getApplicationContext()
-                .getSystemService(Context.TELEPHONY_SERVICE);
-        if (mIncomingCallsReceiver != null) {
-            mIncomingCallsReceiver.listen(new PhoneStateListener() {
-                @Override
-                public void onCallStateChanged(int state, String incomingNumber) {
-                    //Log.d(TAG, "PHONE STATE RADIO broadcast received = " + state);
-                    if (state == TelephonyManager.CALL_STATE_IDLE){
-                        //Log.d(TAG, "IDLE received");
-                        if (called) {
-                            if (intDuration == 0) {
-                                Log.d(TAG, "IDLE received -- > call");
-                                call();
-
-                            }
-                        }
-
-                    }
-                }
-            }, PhoneStateListener.LISTEN_CALL_STATE);
-        }
-*/
     }
 
 

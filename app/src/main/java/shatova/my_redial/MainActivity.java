@@ -1,6 +1,7 @@
 package shatova.my_redial;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.pm.PackageManager;
 import android.net.wifi.aware.PublishConfig;
 import android.provider.CallLog;
@@ -47,6 +48,7 @@ public class MainActivity extends Activity {
 
     EditText phoneNumber;
     Button callButton;
+    Button exitButton;
 
     String TAG = "myLOG";
 
@@ -54,6 +56,8 @@ public class MainActivity extends Activity {
     int attempts = 0;
     EditText attemptsEditText;
     TextView counter;
+
+    ComponentName component;
 
 
 
@@ -102,9 +106,9 @@ public class MainActivity extends Activity {
             Log.d(TAG, "Request Permissions");
             ActivityCompat.requestPermissions(this, PERMISSIONS, MY_PERMISSIONS_REQUEST);
 
-        }else{
+        }//else{
             //Log.d(TAG, "PERMISSIONS GRANTED");
-        }
+        //}
 
 
         callButton = findViewById(R.id.call_button);
@@ -124,8 +128,27 @@ public class MainActivity extends Activity {
             }
         });
 
+        exitButton = findViewById(R.id.exit_button);
+        exitButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.d(TAG, "EXIT button pressed");
+                onDestroy();
+            }
+        });
 
 
+        //disable CallStatus Broadcast receiver declared in manifest
+        component = new ComponentName(getApplication(), CallStatusReceiver.class);
+        int status = getApplicationContext().getPackageManager().getComponentEnabledSetting(component);
+        if(status == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+            Log.d(TAG, "receiver is enabled");
+        } else if(status == PackageManager.COMPONENT_ENABLED_STATE_DISABLED) {
+            Log.d(TAG, "receiver is disabled");
+        }
+
+        //Enable
+        getApplicationContext().getPackageManager().setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_ENABLED , PackageManager.DONT_KILL_APP);
 
 
     }
@@ -156,10 +179,31 @@ public class MainActivity extends Activity {
         Log.d(TAG, "=== onResume === ");
         super.onResume();
 
-        String lastNumber = CallLog.Calls.getLastOutgoingCall(getApplicationContext());
-        phoneNumber.setText(lastNumber);
+        String lastNumber = CallLog.Calls.getLastOutgoingCall(this);
+        if (!lastNumber.isEmpty()){
+            phoneNumber.setText(lastNumber);}
 
         //Log.d(TAG, "LAST OUTGOING!!!!!   " + lastNumber);
+
+
+    }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+
+        //stop CallService
+        stopService(new Intent(this, CallService.class));
+
+
+        //Disable
+        getApplicationContext().getPackageManager().setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_DISABLED , PackageManager.DONT_KILL_APP);
+        //Enable
+        //getApplicationContext().getPackageManager().setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_ENABLED , PackageManager.DONT_KILL_APP);
+
+
+
+        finish();
 
 
     }

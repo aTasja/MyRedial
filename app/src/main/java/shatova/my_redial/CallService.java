@@ -14,6 +14,7 @@ import android.os.IBinder;
 import android.provider.CallLog;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
+import android.telecom.Call;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -24,12 +25,12 @@ import java.util.ArrayList;
 public class CallService extends Service {
 
     String TAG = "myLOG";
-    int mLastState;
+
 
     int attempts;
     String number;
     int tryCall;
-    boolean nextCall;
+
     boolean havePermission;
     private android.content.BroadcastReceiver mReceiver;
 
@@ -47,6 +48,7 @@ public class CallService extends Service {
             @Override
             public void onReceive(Context context, Intent intent) {
                 // Display a notification that radio has been connected.
+                Log.d(TAG, "SERVICE BROADCAST intent received");
                 makeCall();
             }
         };
@@ -100,6 +102,9 @@ public class CallService extends Service {
     }
 
     private void makeCall(){
+
+
+
         int lastCallDuration = Integer.parseInt(getCallDetails(getApplicationContext()));
         Log.d(TAG, "Длительность последнего звонка = " + lastCallDuration);
         if  (lastCallDuration == 0) {
@@ -107,6 +112,7 @@ public class CallService extends Service {
                 Log.d(TAG, "ЗВОНЮ в " + tryCall + " раз из " + attempts);
                 try {
                     getApplicationContext().startActivity(new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + number)));
+                    Toast.makeText(getApplicationContext(), "Making call " + tryCall + " of " + attempts, Toast.LENGTH_SHORT).show();
                     tryCall++;
                 } catch (SecurityException sEx) {
                     Log.d(TAG, "Security permission == " + sEx);
@@ -115,50 +121,73 @@ public class CallService extends Service {
                 Log.d(TAG, "SERVICE ПОПЫТКИ закончились");
                 onDestroy();
             }
-        }else {
+        }else if (tryCall == 1) {
+            Log.d(TAG, "ЗВОНЮ в " + tryCall + " раз из " + attempts);
+            try {
+                getApplicationContext().startActivity(new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + number)));
+                Toast.makeText(getApplicationContext(), "Making call " + tryCall + " of " + attempts, Toast.LENGTH_SHORT).show();
+                tryCall++;
+            } catch (SecurityException sEx) {
+                Log.d(TAG, "Security permission == " + sEx);
+            }
+        }else{
             Log.d(TAG, "SERVICE Длительность последнего звонка больше 0");
+            onDestroy();
         }
 
     }
 
     public static String getCallDetails(Context context) {
 
-
         // StringBuilder sb = new StringBuilder();
         if (ActivityCompat.checkSelfPermission(context,
                 Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
 
 
-            Cursor managedCursor = context.getContentResolver().query(CallLog.Calls.CONTENT_URI, null, null, null, null);
-            //int number = managedCursor.getColumnIndex(CallLog.Calls.NUMBER);
-            int type = managedCursor.getColumnIndex(CallLog.Calls.TYPE);
-            //int date = managedCursor.getColumnIndex(CallLog.Calls.DATE);
-            int duration = managedCursor.getColumnIndex(CallLog.Calls.DURATION);
-            //sb.append("Call Details :");
-            if (managedCursor.moveToPosition(0)) {
-                managedCursor.moveToNext();
-                managedCursor.moveToPosition(0);
-                //String phNumber = managedCursor.getString(number);
-                String callType = managedCursor.getString(type);
-                //String callDate = managedCursor.getString(date);
-                //Date callDayTime = new Date(Long.valueOf(callDate));
-                String callDuration = managedCursor.getString(duration);
-                //String dir = null;
-                int dircode = Integer.parseInt(callType);
-                switch (dircode) {
-                    case CallLog.Calls.OUTGOING_TYPE:
-                        //Log.d(TAG, "OUTGOING");
-                        return callDuration;
+            Cursor managedCursor = context.getContentResolver().query( CallLog.Calls.CONTENT_URI, null, null, null, null);
+            if (managedCursor != null) {
+                //int number = managedCursor.getColumnIndex(CallLog.Calls.NUMBER);
+                int type = managedCursor.getColumnIndex(CallLog.Calls.TYPE);
+                //int date = managedCursor.getColumnIndex(CallLog.Calls.DATE);
+                int duration = managedCursor.getColumnIndex(CallLog.Calls.DURATION);
+                //sb.append("Call Details :");
+                if (managedCursor.moveToFirst()) {
+                    //managedCursor.moveToNext();
+                    managedCursor.moveToPosition(0);
+                    //String phNumber = managedCursor.getString(number);
+                    String callType = managedCursor.getString(type);
+                    //String callDate = managedCursor.getString(date);
+                    //Date callDayTime = new Date(Long.valueOf(callDate));
+                    String callDuration = managedCursor.getString(duration);
+                    //String dir = null;
+                    int dircode = Integer.parseInt(callType);
+                    switch (dircode) {
+                        case CallLog.Calls.OUTGOING_TYPE:
+                            Log.d("myLOG", "OUTGOING" + callDuration);
+                            return callDuration;
 
+                    }
+                    managedCursor.close();
+                }else{
+                    Log.d("myLOG", "CURSOR not moveToFirst()");
                 }
-            }managedCursor.close();
+            }else{
+                Log.d("myLOG", "CURSOR empty");
+            }
         }
 
-        return "";
+        return "0";
     }
 
     public void onDestroy(){
         super.onDestroy();
         Log.d(TAG, "SERVICE onDestroy");
+
+        // unregister BroadcastReceivers
+        if (mReceiver != null){
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(mReceiver);
+            mReceiver = null;
+        }
+        stopSelf();
     }
 }

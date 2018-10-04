@@ -17,16 +17,19 @@ public class CallStatusReceiver extends BroadcastReceiver {
 
     public void onReceive(final Context context, Intent intent) {
 
-        if (intent.getAction() != null && intent.getAction().equals(TelephonyManager.EXTRA_STATE)) {
+        //Log.d(TAG, "Intent ACTION = " + intent.getAction());
+
+        if (intent.getAction()!=null && intent.getAction().equals("android.intent.action.PHONE_STATE")) {
 
             if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals("IDLE")) {
-                Log.d(TAG, "ИНТЕНТ ДЛЯ ЗВОНКА ОТПРАВЛЕН");
+                Log.d(TAG, "phone listener = " + "IDLE --> redial");
                 LocalBroadcastManager.getInstance(context).sendBroadcast(new Intent("possibleToMakeNextCall"));
 
             } else if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals("OFFHOOK")) {
                 Log.d(TAG, "phone listener = " + "OFFHOOK");
             }
         }
+
 
     }
 
